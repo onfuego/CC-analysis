@@ -1043,11 +1043,36 @@ function parseEstadoCuenta(rawText, filename, idx, bancoForzado = null) {
     meses_restantes: pagosMensuales.length - i
   }));
 
+  // ── 4. Pago del mes actual, mínimo y tasa rotativa ────────────────────────
+  // "MONTO TOTAL FACTURADO A PAGAR ... $1.311.195"
+  // "MONTO MÍNIMO A PAGAR $28.192"
+  // "TASA INTERÉS VIGENTE 2,51% 4,36% 4,36%"  → primer % = rotativo
+  let pagoMesActual = 0, pagoMinimo = 0, tasaRotativa = 0;
+
+  for (const line of workLines) {
+    if (!pagoMesActual && /MONTO TOTAL FACTURADO A PAGAR/i.test(line)) {
+      const n = extractNumbers(line);
+      if (n.length) pagoMesActual = n[0];
+    }
+    if (!pagoMinimo && /MONTO M[IÍ]NIMO A PAGAR/i.test(line) && !/MONTO CANCELADO/i.test(line)) {
+      const n = extractNumbers(line);
+      if (n.length) pagoMinimo = n[0];
+    }
+    if (!tasaRotativa && /TASA\s+INTER[EÉ]S\s+VIGENTE/i.test(line)) {
+      // Buscar el primer porcentaje: "2,51%" o "2.51%"
+      const m = line.match(/(\d+[,\.]\d+)\s*%/);
+      if (m) tasaRotativa = parseFloat(m[1].replace(',', '.'));
+    }
+  }
+
   return {
     nombre,
     cupo_total: cupoTotal,
     cupo_usado: cupoUsado,
     cupo_disponible: cupoDisponible,
+    pago_mes_actual: pagoMesActual,
+    pago_minimo: pagoMinimo,
+    tasa_rotativa: tasaRotativa,
     cuotas,
     movimientos,
     _pagosMensuales: pagosMensuales,
@@ -1164,6 +1189,13 @@ function renderResults(data) {
   // Metrics
   const metricsGrid = document.getElementById('metricsGrid');
   const usedClass = pctUsado > 70 ? 'danger' : pctUsado > 40 ? 'warning' : 'accent';
+
+  // Sumar pago mes actual, mínimo y tasa de todas las tarjetas
+  const totalPagoMes   = tarjetas.reduce((s, t) => s + (t.pago_mes_actual || 0), 0);
+  const totalPagoMin   = tarjetas.reduce((s, t) => s + (t.pago_minimo || 0), 0);
+  // Tasa rotativa: promedio ponderado por cupo usado, o la primera que exista
+  const tasaDisplay    = tarjetas.find(t => t.tasa_rotativa > 0)?.tasa_rotativa || 0;
+
   metricsGrid.innerHTML = `
     <div class="metric-card">
       <div class="label">Cupo total</div>
@@ -1180,11 +1212,24 @@ function renderResults(data) {
       <div class="value">${fmt(totalDisponible)}</div>
       <div class="sub">${(100 - pctUsado).toFixed(1)}% libre</div>
     </div>
+    ${totalPagoMes > 0 ? `
+    <div class="metric-card warning">
+      <div class="label">Pago mes actual</div>
+      <div class="value">${fmt(totalPagoMes)}</div>
+      <div class="sub">total facturado</div>
+    </div>` : ''}
+    ${totalPagoMin > 0 ? `
     <div class="metric-card">
-      <div class="label">Pago próximo mes</div>
-      <div class="value">${fmt(getMonthPayment(tarjetas, 0))}</div>
-      <div class="sub">suma de cuotas</div>
-    </div>
+      <div class="label">Pago mínimo</div>
+      <div class="value">${fmt(totalPagoMin)}</div>
+      <div class="sub">monto mínimo</div>
+    </div>` : ''}
+    ${tasaDisplay > 0 ? `
+    <div class="metric-card danger">
+      <div class="label">Tasa rotativa</div>
+      <div class="value">${tasaDisplay.toFixed(2)}%</div>
+      <div class="sub">mensual</div>
+    </div>` : ''}
   `;
 
   // Progress bars
@@ -1192,6 +1237,11 @@ function renderResults(data) {
   pb.innerHTML = tarjetas.map((t, i) => {
     const pct = t.cupo_total > 0 ? (t.cupo_usado / t.cupo_total * 100) : 0;
     const cls = pct > 70 ? 'high' : pct > 40 ? 'mid' : 'low';
+    const extras = [
+      t.pago_mes_actual > 0 ? `<span>Facturado: <strong>${fmt(t.pago_mes_actual)}</strong></span>` : '',
+      t.pago_minimo > 0     ? `<span>Mínimo: <strong>${fmt(t.pago_minimo)}</strong></span>` : '',
+      t.tasa_rotativa > 0   ? `<span>Rotativo: <strong>${t.tasa_rotativa.toFixed(2)}% m.</strong></span>` : '',
+    ].filter(Boolean).join(' · ');
     return `
       <div class="progress-section">
         <div class="progress-header">
@@ -1208,6 +1258,7 @@ function renderResults(data) {
           <span>${pct.toFixed(1)}% utilizado</span>
           <span>${(100-pct).toFixed(1)}% libre</span>
         </div>
+        ${extras ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sec);">${extras}</div>` : ''}
       </div>
     `;
   }).join('');
