@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador de Tarjetas de Crédito</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --border: rgba(0,0,0,0.08);
+    --border-mid: rgba(0,0,0,0.14);
+    --text: #1a1a18;
+    --text-sec: #6b6a65;
+    --text-hint: #9e9d98;
+    --accent: #1a3a2a;
+    --accent-light: #e8f0eb;
+    --accent-mid: #4a7c5f;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
+    --warning: #b8690a;
+    --warning-light: #fdf3e3;
+    --success: #1e6b3f;
+    --success-light: #eaf4ee;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141412;
+      --surface: #1e1e1b;
+      --surface2: #252522;
+      --border: rgba(255,255,255,0.08);
+      --border-mid: rgba(255,255,255,0.14);
+      --text: #f0ede6;
+      --text-sec: #9e9d98;
+      --text-hint: #6b6a65;
+      --accent: #5aad7a;
+      --accent-light: #1a2e22;
+      --accent-mid: #4a7c5f;
+      --danger-light: #2a1614;
+      --warning-light: #2a1e0a;
+      --success-light: #0f2118;
+    }
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .app {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+  }
+
+  header {
+    margin-bottom: 2.5rem;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  header p {
+    color: var(--text-sec);
+    margin-top: 4px;
+    font-size: 14px;
+  }
+
+  .upload-area {
+    border: 1.5px dashed var(--border-mid);
+    border-radius: var(--radius);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: var(--surface);
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .upload-area:hover, .upload-area.drag-over {
+    border-color: var(--accent-mid);
+    background: var(--accent-light);
+  }
+
+  .upload-area input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .upload-area h3 {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .upload-area p {
+    font-size: 13px;
+    color: var(--text-sec);
+  }
+
+  .btn-primary {
+    display: inline-block;
+    margin-top: 1rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 1.25rem;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+    position: relative;
+    z-index: 2;
+  }
+
+  .btn-primary:hover { opacity: 0.85; }
+
+  .cards-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 1.25rem;
+  }
+
+  .card-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px 5px 8px;
+    font-size: 13px;
+    color: var(--text-sec);
+  }
+
+  .card-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card-badge button {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-hint); font-size: 14px; padding: 0; margin-left: 2px;
+    line-height: 1; transition: color 0.15s;
+  }
+
+  .card-badge button:hover { color: var(--danger); }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-hint);
+    margin-bottom: 1rem;
+  }
+
+  .results { display: none; }
+  .results.visible { display: block; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 2rem 0;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 2rem;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+  }
+
+  .metric-card .label {
+    font-size: 12px;
+    color: var(--text-hint);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .metric-card .value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .metric-card .sub {
+    font-size: 12px;
+    color: var(--text-sec);
+    margin-top: 3px;
+  }
+
+  .metric-card.accent { background: var(--accent-light); border-color: transparent; }
+  .metric-card.accent .value { color: var(--accent); }
+  .metric-card.warning { background: var(--warning-light); border-color: transparent; }
+  .metric-card.warning .value { color: var(--warning); }
+  .metric-card.danger { background: var(--danger-light); border-color: transparent; }
+  .metric-card.danger .value { color: var(--danger); }
+
+  .progress-section {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .progress-header .name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .progress-header .amounts {
+    font-size: 12px;
+    color: var(--text-sec);
+    text-align: right;
+  }
+
+  .progress-bar-bg {
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+
+  .progress-bar-fill.low { background: #2a9b5c; }
+  .progress-bar-fill.mid { background: #d97706; }
+  .progress-bar-fill.high { background: #dc2626; }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-hint);
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .chart-card h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .payments-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .payments-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-hint);
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .payments-table td {
+    padding: 9px 10px;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text);
+  }
+
+  .payments-table tr:last-child td { border-bottom: none; }
+  .payments-table tr:hover td { background: var(--surface2); }
+
+  .payments-table .amount { font-weight: 500; text-align: right; }
+  .payments-table .month { color: var(--text-sec); }
+
+  .payments-table .total-row td {
+    font-weight: 600;
+    border-top: 1px solid var(--border-mid);
+    border-bottom: none;
+    padding-top: 12px;
+    color: var(--text);
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .tag.green { background: var(--success-light); color: var(--success); }
+  .tag.orange { background: var(--warning-light); color: var(--warning); }
+  .tag.red { background: var(--danger-light); color: var(--danger); }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-hint);
+    font-size: 14px;
+  }
+
+  .analyze-btn-wrap {
+    margin-top: 1.5rem;
+  }
+
+  .btn-analyze {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.7rem 1.75rem;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+    width: 100%;
+  }
+
+  .btn-analyze:hover { opacity: 0.88; }
+  .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-sec);
+    font-size: 14px;
+  }
+
+  .loading.visible { display: block; }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border-mid);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: var(--danger-light);
+    border: 0.5px solid rgba(192,57,43,0.2);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    color: var(--danger);
+    font-size: 14px;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  .error-box.visible { display: block; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-sec);
+  }
+
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .manual-section {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-top: 1rem;
+  }
+
+  .manual-section h4 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 8px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-hint);
+    margin-bottom: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .form-group input, .form-group select {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--accent-mid);
+  }
+
+  .btn-add {
+    background: var(--accent-light);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    color: var(--accent);
+    font-size: 20px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    line-height: 1;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-add:hover { background: var(--accent); color: #fff; }
+
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 1.5rem;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 7px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-sec);
+    transition: background 0.15s, color 0.15s;
+    border: none;
+    background: none;
+    font-family: inherit;
+  }
+
+  .tab.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1>💳 Analizador de Tarjetas</h1>
+    <p>Sube tus estados de cuenta o ingresa los datos manualmente para ver tu análisis de crédito.</p>
+  </header>
+
+  <div class="tab-row">
+    <button class="tab active" onclick="switchTab('upload')">📄 Subir PDF</button>
+    <button class="tab" onclick="switchTab('manual')">✏️ Ingresar manualmente</button>
+  </div>
+
+  <!-- TAB: UPLOAD -->
+  <div class="tab-content active" id="tab-upload">
+    <div class="upload-area" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf,.txt" multiple>
+      <span class="upload-icon">📂</span>
+      <h3>Arrastra tus estados de cuenta aquí</h3>
+      <p>Acepta PDF o TXT · Múltiples archivos</p>
+      <button class="btn-primary" type="button" onclick="document.getElementById('fileInput').click(); event.stopPropagation();">
+        Elegir archivos
+      </button>
+    </div>
+
+    <div class="cards-list" id="fileList"></div>
+
+    <div class="analyze-btn-wrap">
+      <button class="btn-analyze" id="analyzeBtn" onclick="analyzeFiles()" disabled>
+        Analizar estados de cuenta
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB: MANUAL -->
+  <div class="tab-content" id="tab-manual">
+    <div class="manual-section">
+      <h4>Agregar tarjeta</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="m-name" placeholder="Ej: Visa Banco Chile">
+        </div>
+        <div class="form-group">
+          <label>Cupo total ($)</label>
+          <input type="number" id="m-total" placeholder="3.000.000">
+        </div>
+        <div class="form-group">
+          <label>Cupo usado ($)</label>
+          <input type="number" id="m-used" placeholder="1.200.000">
+        </div>
+        <button class="btn-add" onclick="addManualCard()">+</button>
+      </div>
+      <div id="manual-cards-list" class="cards-list"></div>
+
+      <div style="margin-top:1.5rem;">
+        <h4>Cuotas pendientes (opcional)</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tarjeta</label>
+            <select id="m-installment-card">
+              <option value="">Selecciona...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Monto cuota ($)</label>
+            <input type="number" id="m-installment-amount" placeholder="150.000">
+          </div>
+          <div class="form-group">
+            <label>N° cuotas restantes</label>
+            <input type="number" id="m-installment-count" placeholder="6">
+          </div>
+          <button class="btn-add" onclick="addManualInstallment()">+</button>
+        </div>
+        <div id="manual-installments-list" class="cards-list"></div>
+      </div>
+
+      <div class="analyze-btn-wrap" style="margin-top:1.25rem;">
+        <button class="btn-analyze" id="analyzeManualBtn" onclick="analyzeManual()">
+          Ver análisis
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div id="debugPanel" style="display:none; margin-top:1rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <span style="font-size:12px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.05em;">Texto extraído del PDF (debug)</span>
+      <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:18px;line-height:1;">×</button>
+    </div>
+    <div id="debugTabs" style="display:flex;gap:4px;margin-bottom:8px;"></div>
+    <pre id="debugText" style="background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:1rem;font-size:11px;overflow:auto;max-height:300px;white-space:pre-wrap;word-break:break-all;color:var(--text-sec);font-family:monospace;"></pre>
+  </div>
+  <div class="loading" id="loadingBox">
+    <div class="spinner"></div>
+    <span id="loadingMsg">Leyendo estados de cuenta...</span>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="divider"></div>
+    <p class="section-title">Resumen general</p>
+
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <p class="section-title" style="margin-top:1.5rem;">Cupo por tarjeta</p>
+    <div id="progressBars"></div>
+
+    <p class="section-title" style="margin-top:1.5rem;">Pagos próximos meses</p>
+    <div class="chart-card">
+      <h3>Cuotas mensuales</h3>
+      <div class="legend" id="paymentsLegend"></div>
+      <div style="position:relative; width:100%; height:220px;">
+        <canvas id="paymentsChart" role="img" aria-label="Gráfico de pagos mensuales próximos 12 meses"></canvas>
+      </div>
+      <div style="overflow-x:auto; margin-top:1.25rem;">
+        <table class="payments-table" id="paymentsMonthTable">
+          <thead><tr id="paymentsMonthHead"></tr></thead>
+          <tbody id="paymentsMonthBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.5rem;">Desglose por mes</p>
+    <div class="chart-card" id="desgloseCard">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label style="font-size:13px; color:var(--text-sec); font-weight:500;">Ver mes:</label>
+        <select id="mesSelect" style="font-size:14px; padding:6px 10px; border-radius:var(--radius-sm); border:0.5px solid var(--border-mid); background:var(--surface2); color:var(--text); font-family:inherit; cursor:pointer;">
+        </select>
+        <span id="desgloseTotalBadge" style="margin-left:auto; font-size:13px; color:var(--text-sec);"></span>
+      </div>
+      <div style="overflow-x:auto; margin-top:1rem;">
+        <table class="payments-table" id="desgloseTable">
+          <thead>
+            <tr>
+              <th>Movimiento</th>
+              <th>Tarjeta</th>
+              <th style="text-align:center">Cuota</th>
+              <th style="text-align:right">Monto compra</th>
+              <th style="text-align:right">Valor cuota</th>
+            </tr>
+          </thead>
+          <tbody id="desgloseBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.5rem;">Liberación de cupo</p>
+    <div class="chart-card">
+      <h3>Cupo disponible acumulado</h3>
+      <div style="position:relative; width:100%; height:220px;">
+        <canvas id="availableChart" role="img" aria-label="Gráfico de cupo disponible a través del tiempo"></canvas>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:1.5rem;">Movimientos en cuotas</p>
+    <div id="movimientosContainer"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const COLORS = ['#2a7d4f','#1a5fa8','#b5590a','#7c3aab','#1e7b7b','#b52a2a','#5a7a1e'];
+let uploadedFiles = [];
+let manualCards = [];
+let manualInstallments = [];
+let paymentsChartObj, availableChartObj;
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  hideResults();
+}
+
+function hideResults() {
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('errorBox').classList.remove('visible');
+}
+
+// FILE UPLOAD
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles([...e.dataTransfer.files]);
+});
+
+fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
+
+function handleFiles(files) {
+  files.forEach(f => {
+    if (!uploadedFiles.find(u => u.name === f.name)) uploadedFiles.push(f);
+  });
+  renderFileList();
+}
+
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  list.innerHTML = uploadedFiles.map((f, i) => `
+    <div class="card-badge">
+      <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
+      ${f.name}
+      <button onclick="removeFile(${i})" title="Eliminar">×</button>
+    </div>
+  `).join('');
+  document.getElementById('analyzeBtn').disabled = uploadedFiles.length === 0;
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i, 1);
+  renderFileList();
+}
+
+async function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function extractTextFromPDF(file) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const arrayBuffer = await readFileAsArrayBuffer(file);
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+
+      // Agrupar items por posición Y (línea) con tolerancia de 3px
+      // Esto replica el comportamiento de pdfplumber y evita mezclar columnas
+      const itemsByLine = [];
+      for (const item of content.items) {
+        if (!item.str.trim()) continue;
+        const y = Math.round(item.transform[5] / 3) * 3; // redondear a múltiplos de 3
+        const existing = itemsByLine.find(l => Math.abs(l.y - y) <= 3);
+        if (existing) {
+          existing.items.push({ x: item.transform[4], str: item.str });
+        } else {
+          itemsByLine.push({ y, items: [{ x: item.transform[4], str: item.str }] });
+        }
+      }
+
+      // Ordenar líneas de arriba a abajo (Y mayor = más arriba en PDF coords)
+      itemsByLine.sort((a, b) => b.y - a.y);
+
+      // Dentro de cada línea, ordenar de izquierda a derecha
+      const pageLines = itemsByLine.map(line => {
+        line.items.sort((a, b) => a.x - b.x);
+        return line.items.map(i => i.str).join(' ').trim();
+      }).filter(Boolean);
+
+      // Detectar si esta página es del estado internacional — saltarla
+      const pageText = pageLines.join('\n');
+      if (/ESTADO DE CUENTA INTERNACIONAL/i.test(pageText)) continue;
+
+      fullText += pageText + '\n';
+    }
+    return fullText;
+  } catch(e) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result || '');
+      reader.onerror = () => resolve('');
+      reader.readAsText(file, 'latin1');
+    });
+  }
+}
+
+async function analyzeFiles() {
+  if (uploadedFiles.length === 0) return;
+  showLoading(true);
+  hideResults();
+  clearError();
+
+  try {
+    const tarjetas = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const f = uploadedFiles[i];
+      document.getElementById('loadingMsg').textContent = `Leyendo ${f.name} (${i+1}/${uploadedFiles.length})...`;
+      let text = '';
+      try { text = await extractTextFromPDF(f); } catch(e) { text = ''; }
+      const parsed = parseEstadoCuenta(text, f.name, i);
+      if (parsed) tarjetas.push(parsed);
+    }
+    renderResults({ tarjetas });
+    showDebugButton();
+  } catch(e) {
+    showError('Error al analizar: ' + e.message + '. Intenta con el ingreso manual.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ─── Helpers numéricos ───────────────────────────────────────────────────────
+
+function parseMoney(s) {
+  if (!s) return 0;
+  // Formato chileno: $12.000.000 o 6.685.802 — quitar $, puntos de miles
+  return parseInt(s.replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(/,\d+$/, '')) || 0;
+}
+
+function extractNumbers(s) {
+  const matches = [...s.matchAll(/\$?\s*((?:\d{1,3})(?:\.\d{3})*|\d{4,})/g)];
+  return matches.map(m => parseMoney(m[1])).filter(n => n >= 1000);
+}
+
+// ─── Parser principal ────────────────────────────────────────────────────────
+
+function parseEstadoCuenta(rawText, filename, idx) {
+  window._lastPDFText = window._lastPDFText || [];
+  window._lastPDFText[idx] = rawText;
+
+  const lines = rawText.replace(/\r/g, '\n').split('\n').map(l => l.trim()).filter(Boolean);
+
+  // ── 1. Nombre del banco ───────────────────────────────────────────────────
+  // Buscar solo en líneas cortas que no sean transacciones (sin fechas DD/MM ni montos $)
+  let nombre = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  const isTransactionLine = l => /\d{2}\/\d{2}\/?\d{0,2}/.test(l) || /\$[\d\.]{3,}/.test(l);
+  const headerText = lines.filter(l => l.length < 80 && !isTransactionLine(l)).join(' ');
+
+  const bancosTexto = [
+    { re: /\bBCI\b/,             label: 'BCI' },
+    { re: /banco\s+de\s+chile/i, label: 'Banco de Chile' },
+    { re: /santander/i,          label: 'Santander' },
+    { re: /scotiabank/i,         label: 'Scotiabank' },
+    { re: /\bitau\b/i,           label: 'Itaú' },
+    { re: /\bbbva\b/i,           label: 'BBVA' },
+    { re: /banco\s+estado/i,     label: 'BancoEstado' },
+    { re: /bancoestado/i,        label: 'BancoEstado' },
+    { re: /security/i,           label: 'Banco Security' },
+    { re: /\bbice\b/i,           label: 'Banco Bice' },
+    { re: /coopeuch/i,           label: 'Coopeuch' },
+    { re: /consorcio/i,          label: 'Banco Consorcio' },
+  ];
+  for (const { re, label } of bancosTexto) {
+    if (re.test(headerText) || re.test(filename)) { nombre = label; break; }
+  }
+
+  // Las páginas internacionales ya fueron filtradas en extractTextFromPDF.
+  // Verificar que quede al menos contenido nacional.
+  const tieneNacional = lines.some(l => /ESTADO DE CUENTA NACIONAL/i.test(l));
+  const soloInternacional = !tieneNacional && lines.some(l => /ESTADO DE CUENTA INTERNACIONAL/i.test(l));
+  if (soloInternacional) return null;
+
+  const workLines = lines;
+
+  // ── 2. Cupos ─────────────────────────────────────────────────────────────
+  // Formato BCI exacto: "CUPO TOTAL $ 12.000.000 $ 6.685.802 $ 5.314.198"
+  // La PRIMERA línea con "CUPO TOTAL" que tenga números es la de datos.
+  // La línea de encabezado dice "CUPO TOTAL  CUPO UTILIZADO  CUPO DISPONIBLE" (sin números).
+  let cupoTotal = 0, cupoUsado = 0, cupoDisponible = 0;
+
+  for (let i = 0; i < workLines.length; i++) {
+    const l = workLines[i];
+    // Solo líneas que empiecen con "CUPO TOTAL" y no contengan "CUPO UTILIZADO" (eso es header)
+    if (!/^CUPO\s+TOTAL\b/i.test(l)) continue;
+    if (/CUPO\s+UTILIZADO|CUPO\s+DISPONIBLE/i.test(l)) continue;
+    // Esta línea debería tener los montos
+    const nums = extractNumbers(l);
+    if (nums.length >= 3) {
+      [cupoTotal, cupoUsado, cupoDisponible] = [nums[0], nums[1], nums[2]];
+      break;
+    }
+    if (nums.length === 2) {
+      [cupoTotal, cupoDisponible] = [nums[0], nums[1]];
+      cupoUsado = cupoTotal - cupoDisponible;
+      break;
+    }
+    // Si no hay números en esta línea, buscar en la siguiente
+    if (nums.length === 0 && i + 1 < workLines.length) {
+      const nextNums = extractNumbers(workLines[i+1]);
+      if (nextNums.length >= 3) {
+        [cupoTotal, cupoUsado, cupoDisponible] = [nextNums[0], nextNums[1], nextNums[2]];
+        break;
+      }
+    }
+  }
+
+  // Fallback: buscar etiquetas individualmente
+  if (!cupoTotal) {
+    const findNext = (re) => {
+      for (let i = 0; i < workLines.length; i++) {
+        if (re.test(workLines[i]) && !/CUPO\s+UTILIZADO|CUPO\s+DISPONIBLE/i.test(workLines[i])) {
+          const n = extractNumbers(workLines[i] + ' ' + (workLines[i+1]||''));
+          if (n.length) return n[0];
+        }
+      }
+      return 0;
+    };
+    cupoTotal      = findNext(/cupo\s+total/i) || findNext(/l[ií]mite.*cr[eé]dito/i);
+    cupoUsado      = findNext(/cupo\s+utilizado/i) || findNext(/saldo\s+deudor/i);
+    cupoDisponible = findNext(/cupo\s+disponible/i) || findNext(/saldo\s+disponible/i);
+    if (cupoTotal && cupoUsado && !cupoDisponible) cupoDisponible = cupoTotal - cupoUsado;
+    if (cupoTotal && cupoDisponible && !cupoUsado) cupoUsado = cupoTotal - cupoDisponible;
+  }
+
+  if (!cupoTotal) {
+    return { nombre, cupo_total: 0, cupo_usado: 0, cupo_disponible: 0, cuotas: [],
+      _error: 'No se pudieron leer los cupos. Usa el ingreso manual.' };
+  }
+
+  // ── 3. Pagos mensuales y liberación de cupo ──────────────────────────────
+  const cuotaLineRe = /(\d{2})\/(\d{2})\s+\$([\d\.]+)\s*$/;
+  const compras = [];
+  const movimientos = []; // detalle para la tabla
+
+  for (const line of workLines) {
+    if (line.includes('-')) continue;
+    const m = line.match(cuotaLineRe);
+    if (!m) continue;
+    const actual    = parseInt(m[1]);
+    const total     = parseInt(m[2]);
+    const valor     = parseMoney(m[3]);
+    const restantes = total - actual;
+    if (valor < 500 || total > 60) continue;
+
+    // Monto original de la compra: primer $ de la línea
+    const allMontos = [...line.matchAll(/\$([\d\.]+)/g)].map(x => parseMoney(x[1]));
+    const montoCompra = allMontos.length > 0 ? allMontos[0] : valor * total;
+
+    // Descripción: limpiar fecha, código, y sufijo numérico
+    let desc = line
+      .replace(/^[A-Z\s]+\d{2}\/\d{2}\/?\d{0,2}\s+\d{4}\s+\w+\s+/, '') // quitar lugar+fecha+cod
+      .replace(/\s+TASA\s+INT.*$/i, '')   // quitar tasa interés
+      .replace(/[\d\.\$\s\/]+$/, '')       // quitar números del final
+      .trim().slice(0, 45) || 'Compra en cuotas';
+
+    if (restantes > 0) {
+      compras.push({ restantes, valor });
+    }
+    // Guardar todos para la tabla (incluyendo ya pagadas si total > 1)
+    if (total > 1) {
+      movimientos.push({ desc, montoCompra, valor, actual, total, restantes });
+    }
+  }
+
+  // Calcular pagos mensuales y cupo liberado acumulado
+  let pagosMensuales = [];
+  let cupoLiberadoAcumulado = [];
+
+  if (compras.length > 0) {
+    const maxMes = Math.max(...compras.map(c => c.restantes));
+    let acumulado = 0;
+    for (let mes = 0; mes < Math.min(maxMes, 36); mes++) {
+      const pagoMes = compras
+        .filter(c => mes < c.restantes)
+        .reduce((s, c) => s + c.valor, 0);
+      acumulado += pagoMes;
+      pagosMensuales.push(pagoMes);
+      cupoLiberadoAcumulado.push(acumulado);
+    }
+  }
+
+  const cuotas = pagosMensuales.map((monto, i) => ({
+    descripcion: `Mes ${i+1}`,
+    monto_mensual: monto,
+    meses_restantes: pagosMensuales.length - i
+  }));
+
+  return {
+    nombre,
+    cupo_total: cupoTotal,
+    cupo_usado: cupoUsado,
+    cupo_disponible: cupoDisponible,
+    cuotas,
+    movimientos,
+    _pagosMensuales: pagosMensuales,
+    _cupoLiberadoAcumulado: cupoLiberadoAcumulado
+  };
+}
+
+// MANUAL ENTRY
+function addManualCard() {
+  const name = document.getElementById('m-name').value.trim();
+  const total = parseFloat(document.getElementById('m-total').value);
+  const used = parseFloat(document.getElementById('m-used').value);
+
+  if (!name || isNaN(total) || isNaN(used)) {
+    alert('Completa todos los campos de la tarjeta.');
+    return;
+  }
+  if (used > total) { alert('El cupo usado no puede ser mayor al total.'); return; }
+
+  manualCards.push({ nombre: name, cupo_total: total, cupo_usado: used, cupo_disponible: total - used, cuotas: [] });
+  document.getElementById('m-name').value = '';
+  document.getElementById('m-total').value = '';
+  document.getElementById('m-used').value = '';
+  renderManualCards();
+}
+
+function renderManualCards() {
+  const list = document.getElementById('manual-cards-list');
+  list.innerHTML = manualCards.map((c, i) => `
+    <div class="card-badge">
+      <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
+      ${c.nombre} · ${fmt(c.cupo_disponible)} disponible
+      <button onclick="removeManualCard(${i})">×</button>
+    </div>
+  `).join('');
+
+  const sel = document.getElementById('m-installment-card');
+  sel.innerHTML = '<option value="">Selecciona...</option>' +
+    manualCards.map((c, i) => `<option value="${i}">${c.nombre}</option>`).join('');
+}
+
+function removeManualCard(i) {
+  manualCards.splice(i, 1);
+  manualInstallments = manualInstallments.filter(inst => inst.cardIndex !== i)
+    .map(inst => ({ ...inst, cardIndex: inst.cardIndex > i ? inst.cardIndex - 1 : inst.cardIndex }));
+  renderManualCards();
+  renderManualInstallments();
+}
+
+function addManualInstallment() {
+  const cardIdx = document.getElementById('m-installment-card').value;
+  const amount = parseFloat(document.getElementById('m-installment-amount').value);
+  const count = parseInt(document.getElementById('m-installment-count').value);
+
+  if (cardIdx === '' || isNaN(amount) || isNaN(count)) {
+    alert('Completa todos los campos de la cuota.');
+    return;
+  }
+
+  const idx = parseInt(cardIdx);
+  manualInstallments.push({ cardIndex: idx, monto_mensual: amount, meses_restantes: count });
+  manualCards[idx].cuotas.push({ descripcion: 'Cuota', monto_mensual: amount, meses_restantes: count });
+
+  document.getElementById('m-installment-amount').value = '';
+  document.getElementById('m-installment-count').value = '';
+  renderManualInstallments();
+}
+
+function renderManualInstallments() {
+  const list = document.getElementById('manual-installments-list');
+  list.innerHTML = manualInstallments.map((inst, i) => `
+    <div class="card-badge">
+      <span class="dot" style="background:#888"></span>
+      ${manualCards[inst.cardIndex]?.nombre || '?'} · ${fmt(inst.monto_mensual)}/mes × ${inst.meses_restantes}
+      <button onclick="removeInstallment(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function removeInstallment(i) {
+  const inst = manualInstallments[i];
+  const card = manualCards[inst.cardIndex];
+  if (card) card.cuotas = card.cuotas.filter((c, ci) => {
+    return !(c.monto_mensual === inst.monto_mensual && c.meses_restantes === inst.meses_restantes);
+  });
+  manualInstallments.splice(i, 1);
+  renderManualInstallments();
+}
+
+function analyzeManual() {
+  if (manualCards.length === 0) { alert('Agrega al menos una tarjeta.'); return; }
+  hideResults();
+  renderResults({ tarjetas: manualCards });
+}
+
+// RENDER RESULTS
+function renderResults(data) {
+  let tarjetas = data.tarjetas || [];
+  if (tarjetas.length === 0) { showError("No se encontraron tarjetas en los datos."); return; }
+
+  const errores = tarjetas.filter(t => t._error);
+  if (errores.length > 0) {
+    const msg = errores.map(t => "• " + t.nombre + ": " + t._error).join("\n");
+    showError("Algunos archivos no pudieron leerse automáticamente:\n" + msg);
+  }
+  tarjetas = tarjetas.filter(t => !t._error || t.cupo_total > 0);
+  if (tarjetas.length === 0) { return; }
+
+  const totalCupo = tarjetas.reduce((s, t) => s + (t.cupo_total || 0), 0);
+  const totalUsado = tarjetas.reduce((s, t) => s + (t.cupo_usado || 0), 0);
+  const totalDisponible = tarjetas.reduce((s, t) => s + (t.cupo_disponible || 0), 0);
+  const pctUsado = totalCupo > 0 ? (totalUsado / totalCupo * 100) : 0;
+
+  // Metrics
+  const metricsGrid = document.getElementById('metricsGrid');
+  const usedClass = pctUsado > 70 ? 'danger' : pctUsado > 40 ? 'warning' : 'accent';
+  metricsGrid.innerHTML = `
+    <div class="metric-card">
+      <div class="label">Cupo total</div>
+      <div class="value">${fmt(totalCupo)}</div>
+      <div class="sub">${tarjetas.length} tarjeta${tarjetas.length > 1 ? 's' : ''}</div>
+    </div>
+    <div class="metric-card ${usedClass}">
+      <div class="label">Cupo usado</div>
+      <div class="value">${fmt(totalUsado)}</div>
+      <div class="sub">${pctUsado.toFixed(1)}% del total</div>
+    </div>
+    <div class="metric-card accent">
+      <div class="label">Cupo disponible</div>
+      <div class="value">${fmt(totalDisponible)}</div>
+      <div class="sub">${(100 - pctUsado).toFixed(1)}% libre</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Pago próximo mes</div>
+      <div class="value">${fmt(getMonthPayment(tarjetas, 0))}</div>
+      <div class="sub">suma de cuotas</div>
+    </div>
+  `;
+
+  // Progress bars
+  const pb = document.getElementById('progressBars');
+  pb.innerHTML = tarjetas.map((t, i) => {
+    const pct = t.cupo_total > 0 ? (t.cupo_usado / t.cupo_total * 100) : 0;
+    const cls = pct > 70 ? 'high' : pct > 40 ? 'mid' : 'low';
+    return `
+      <div class="progress-section">
+        <div class="progress-header">
+          <span class="name" style="color:${COLORS[i % COLORS.length]}">${t.nombre}</span>
+          <div class="amounts">
+            <div>${fmt(t.cupo_disponible)} disponible</div>
+            <div style="color:var(--text-hint)">${fmt(t.cupo_usado)} usado de ${fmt(t.cupo_total)}</div>
+          </div>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill ${cls}" style="width:${Math.min(pct,100).toFixed(1)}%"></div>
+        </div>
+        <div class="progress-meta">
+          <span>${pct.toFixed(1)}% utilizado</span>
+          <span>${(100-pct).toFixed(1)}% libre</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Chart data — usar horizonte completo de cuotas
+  const today = new Date();
+  const horizonte12 = Math.max(
+    12,
+    ...tarjetas.map(t => t._pagosMensuales ? t._pagosMensuales.length : 0)
+  );
+  const monthLabels = [];
+  for (let i = 0; i < Math.min(horizonte12, 36); i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    monthLabels.push(d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }));
+  }
+
+  const paymentsData = tarjetas.map((t, idx) => ({
+    label: t.nombre,
+    color: COLORS[idx % COLORS.length],
+    data: monthLabels.map((_, mi) => getMonthPaymentForCard(t, mi))
+  }));
+
+  // Payments legend
+  const legend = document.getElementById('paymentsLegend');
+  legend.innerHTML = paymentsData.map(d => `
+    <span><span class="legend-dot" style="background:${d.color}"></span>${d.nombre || d.label}</span>
+  `).join('');
+
+  // Destroy old charts
+  if (paymentsChartObj) paymentsChartObj.destroy();
+  if (availableChartObj) availableChartObj.destroy();
+
+  // Payments chart (stacked bar)
+  paymentsChartObj = new Chart(document.getElementById('paymentsChart'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: paymentsData.map(d => ({
+        label: d.label,
+        data: d.data,
+        backgroundColor: d.color + 'cc',
+        borderColor: d.color,
+        borderWidth: 0,
+        borderRadius: 3
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, color: '#888' } },
+        y: { stacked: true, grid: { color: 'rgba(128,128,128,0.1)' }, ticks: {
+          font: { size: 11 }, color: '#888',
+          callback: v => '$' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v)
+        }}
+      }
+    }
+  });
+
+  // Cupo disponible a través del tiempo
+  // Extender el horizonte hasta que se libere todo el cupo (o máx 36 meses)
+  const maxMeses = Math.max(
+    12,
+    ...tarjetas.map(t => t._pagosMensuales ? t._pagosMensuales.length : 0)
+  );
+  const horizonte = Math.min(maxMeses, 36);
+
+  // Generar labels para todo el horizonte
+  const allMonthLabels = [];
+  for (let i = 0; i < horizonte; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    allMonthLabels.push(d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }));
+  }
+
+  // Cupo disponible total inicial y total máximo
+  const totalCupoDisp0 = tarjetas.reduce((s, t) => s + (t.cupo_disponible || 0), 0);
+  const totalCupoMax   = tarjetas.reduce((s, t) => s + (t.cupo_total || 0), 0);
+
+  const availableData = allMonthLabels.map((_, mi) => getCupoDisponibleEnMes(tarjetas, mi));
+  // Agregar punto 0 = hoy (cupo disponible actual)
+  availableData.unshift(totalCupoDisp0);
+  allMonthLabels.unshift('Hoy');
+
+  availableChartObj = new Chart(document.getElementById('availableChart'), {
+    type: 'line',
+    data: {
+      labels: allMonthLabels,
+      datasets: [{
+        label: 'Cupo disponible',
+        data: availableData,
+        borderColor: '#2a7d4f',
+        backgroundColor: 'rgba(42,125,79,0.06)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: (ctx) => ctx.dataIndex === 0 ? 5 : 3,
+        pointBackgroundColor: '#2a7d4f',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        annotation: undefined,
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              const pct = totalCupoMax > 0 ? ((v / totalCupoMax) * 100).toFixed(1) : 0;
+              return ` $${Math.round(v).toLocaleString('es-CL')}  (${pct}% libre)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#888', maxTicksLimit: 12 } },
+        y: {
+          min: 0, max: totalCupoMax,
+          grid: { color: 'rgba(128,128,128,0.1)' },
+          ticks: {
+            font: { size: 11 }, color: '#888',
+            callback: v => '$' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v)
+          }
+        }
+      }
+    }
+  });
+
+  // Movimientos en cuotas — agrupados por tarjeta
+  const container = document.getElementById('movimientosContainer');
+  let movHtml = '';
+
+  tarjetas.forEach((t, idx) => {
+    const movs = t.movimientos || [];
+    // Separar en pendientes (restantes > 0) y ya pagados (restantes = 0)
+    const pendientes = movs.filter(m => m.restantes > 0);
+    const pagados    = movs.filter(m => m.restantes === 0);
+
+    if (movs.length === 0) return;
+
+    movHtml += `
+      <div class="chart-card" style="padding:0; overflow:hidden; margin-bottom:1rem;">
+        <div style="padding:0.9rem 1.1rem 0.7rem; border-bottom:0.5px solid var(--border); display:flex; align-items:center; gap:8px;">
+          <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[idx%COLORS.length]};flex-shrink:0;display:inline-block;"></span>
+          <span style="font-size:14px;font-weight:500;">${t.nombre}</span>
+          <span style="font-size:12px;color:var(--text-hint);margin-left:auto;">${pendientes.length} pendiente${pendientes.length!==1?'s':''} · ${pagados.length} pagada${pagados.length!==1?'s':''}</span>
+        </div>
+        <table class="payments-table">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th style="text-align:right">Monto compra</th>
+              <th style="text-align:right">Valor cuota</th>
+              <th style="text-align:center">Pagadas</th>
+              <th style="text-align:center">Restantes</th>
+              <th style="text-align:center">Progreso</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    // Primero pendientes, luego pagadas
+    const renderRow = (mv, isPaid) => {
+      const pct = Math.round((mv.actual / mv.total) * 100);
+      const barColor = isPaid ? '#6b6a65' : (mv.restantes <= 2 ? '#d97706' : '#2a7d4f');
+      return `<tr style="${isPaid ? 'opacity:0.5' : ''}">
+        <td style="font-size:13px;">${mv.desc}</td>
+        <td class="amount" style="font-size:13px;">${fmt(mv.montoCompra)}</td>
+        <td class="amount" style="font-size:13px;">${fmt(mv.valor)}</td>
+        <td style="text-align:center;font-size:13px;">${mv.actual}</td>
+        <td style="text-align:center;font-size:13px;font-weight:${isPaid?'400':'500'};color:${isPaid?'var(--text-hint)':'var(--text)'};">${mv.restantes}</td>
+        <td style="padding:8px 12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="flex:1;height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:99px;"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text-hint);min-width:28px;text-align:right;">${mv.actual}/${mv.total}</span>
+          </div>
+        </td>
+      </tr>`;
+    };
+
+    pendientes.forEach(mv => { movHtml += renderRow(mv, false); });
+    pagados.forEach(mv   => { movHtml += renderRow(mv, true);  });
+
+    movHtml += `</tbody></table></div>`;
+  });
+
+  if (!movHtml) {
+    movHtml = `<div style="text-align:center;color:var(--text-hint);padding:2rem;font-size:14px;">No se encontraron compras en cuotas</div>`;
+  }
+
+  container.innerHTML = movHtml;
+
+  // ── Tabla de pagos mensuales ──────────────────────────────────────────────
+  // Encabezado: Tarjeta | mes1 | mes2 | ... | Total
+  const thead = document.getElementById('paymentsMonthHead');
+  const tbody2 = document.getElementById('paymentsMonthBody');
+
+  // Construir encabezado de meses
+  let headHtml = '<th>Tarjeta</th>';
+  monthLabels.forEach(ml => {
+    headHtml += `<th style="text-align:right;white-space:nowrap;">${ml}</th>`;
+  });
+  headHtml += '<th style="text-align:right">Total</th>';
+  thead.innerHTML = headHtml;
+
+  // Una fila por tarjeta
+  let bodyHtml = '';
+  const totalesPorMes = new Array(monthLabels.length).fill(0);
+
+  tarjetas.forEach((t, idx) => {
+    const pagosPorMes = monthLabels.map((_, mi) => getMonthPaymentForCard(t, mi));
+    const totalTarjeta = pagosPorMes.reduce((s, v) => s + v, 0);
+    pagosPorMes.forEach((v, mi) => { totalesPorMes[mi] += v; });
+
+    bodyHtml += `<tr>
+      <td style="white-space:nowrap;font-size:13px;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[idx%COLORS.length]};margin-right:6px;vertical-align:middle;"></span>
+        ${t.nombre}
+      </td>`;
+    pagosPorMes.forEach(v => {
+      bodyHtml += `<td class="amount" style="font-size:13px;color:${v===0?'var(--text-hint)':'var(--text)'}">${v===0 ? '—' : fmt(v)}</td>`;
+    });
+    bodyHtml += `<td class="amount" style="font-size:13px;font-weight:500;">${fmt(totalTarjeta)}</td></tr>`;
+  });
+
+  // Fila de totales
+  const granTotal = totalesPorMes.reduce((s, v) => s + v, 0);
+  bodyHtml += `<tr class="total-row"><td>Total</td>`;
+  totalesPorMes.forEach(v => {
+    bodyHtml += `<td class="amount">${v === 0 ? '—' : fmt(v)}</td>`;
+  });
+  bodyHtml += `<td class="amount">${fmt(granTotal)}</td></tr>`;
+
+  tbody2.innerHTML = bodyHtml;
+
+  // ── Desglose por mes ──────────────────────────────────────────────────────
+  // Para cada mes, construir la lista de movimientos que aportan una cuota ese mes.
+  // Un movimiento aporta al mes N si N < restantes (igual que el cálculo de pagos).
+  // La cuota que se paga en el mes N es la número (actual + N + 1) de total.
+
+  // Construir índice: mesIndex → [ { tarjeta, desc, montoCompra, valor, actual, total, numCuotaEnMes } ]
+  const desglosePorMes = monthLabels.map((_, mi) => {
+    const items = [];
+    tarjetas.forEach((t, tidx) => {
+      (t.movimientos || []).forEach(mv => {
+        if (mi < mv.restantes) {
+          items.push({
+            tarjeta: t.nombre,
+            color: COLORS[tidx % COLORS.length],
+            desc: mv.desc,
+            montoCompra: mv.montoCompra,
+            valor: mv.valor,
+            numCuota: mv.actual + mi + 1,  // cuota que se paga ese mes
+            total: mv.total
+          });
+        }
+      });
+    });
+    return items;
+  });
+
+  // Populate dropdown
+  const sel = document.getElementById('mesSelect');
+  sel.innerHTML = monthLabels.map((label, mi) => {
+    const total = desglosePorMes[mi].reduce((s, i) => s + i.valor, 0);
+    return `<option value="${mi}">${label}  —  ${fmt(total)}</option>`;
+  }).join('');
+
+  function renderDesglose(mi) {
+    const items = desglosePorMes[mi] || [];
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    document.getElementById('desgloseTotalBadge').innerHTML =
+      `<strong>${items.length}</strong> cuota${items.length!==1?'s':''} · Total: <strong style="color:var(--accent)">${fmt(total)}</strong>`;
+
+    const db = document.getElementById('desgloseBody');
+    if (items.length === 0) {
+      db.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-hint);padding:1.5rem;">Sin cuotas este mes</td></tr>`;
+      return;
+    }
+    db.innerHTML = items.map(item => `
+      <tr>
+        <td style="font-size:13px;">${item.desc}</td>
+        <td style="font-size:13px;white-space:nowrap;">
+          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${item.color};margin-right:5px;vertical-align:middle;"></span>
+          ${item.tarjeta}
+        </td>
+        <td style="text-align:center;font-size:13px;color:var(--text-sec);">${item.numCuota}/${item.total}</td>
+        <td class="amount" style="font-size:13px;color:var(--text-sec);">${fmt(item.montoCompra)}</td>
+        <td class="amount" style="font-size:13px;font-weight:500;">${fmt(item.valor)}</td>
+      </tr>`).join('');
+  }
+
+  sel.addEventListener('change', () => renderDesglose(parseInt(sel.value)));
+  renderDesglose(0);
+
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function getMonthPayment(tarjetas, monthIndex) {
+  return tarjetas.reduce((sum, t) => sum + getMonthPaymentForCard(t, monthIndex), 0);
+}
+
+function getMonthPaymentForCard(t, monthIndex) {
+  if (t._pagosMensuales && t._pagosMensuales.length > 0) {
+    return t._pagosMensuales[monthIndex] || 0;
+  }
+  if (!t.cuotas || t.cuotas.length === 0) return 0;
+  return t.cuotas.reduce((sum, c) => {
+    if (monthIndex < (c.meses_restantes || 0)) return sum + (c.monto_mensual || 0);
+    return sum;
+  }, 0);
+}
+
+// Cupo disponible en el mes N = disponible actual + cupo liberado acumulado hasta ese mes
+function getCupoDisponibleEnMes(tarjetas, monthIndex) {
+  return tarjetas.reduce((sum, t) => {
+    const base = t.cupo_disponible || 0;
+    const liberado = t._cupoLiberadoAcumulado
+      ? (t._cupoLiberadoAcumulado[monthIndex] || t._cupoLiberadoAcumulado[t._cupoLiberadoAcumulado.length - 1] || 0)
+      : 0;
+    // No puede superar el cupo total
+    return sum + Math.min(base + liberado, t.cupo_total || base + liberado);
+  }, 0);
+}
+
+function fmt(n) {
+  if (!n || isNaN(n)) return '$0';
+  return '$' + Math.round(n).toLocaleString('es-CL');
+}
+
+function showLoading(show) {
+  document.getElementById('loadingBox').classList.toggle('visible', show);
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.style.whiteSpace = 'pre-wrap';
+  box.textContent = msg;
+  box.classList.add('visible');
+}
+
+function clearError() {
+  document.getElementById('errorBox').classList.remove('visible');
+}
+
+function showDebugButton() {
+  const texts = window._lastPDFText || [];
+  if (!texts.length) return;
+  const panel = document.getElementById('debugPanel');
+  const tabsEl = document.getElementById('debugTabs');
+  const textEl = document.getElementById('debugText');
+
+  // Build tabs, one per file
+  tabsEl.innerHTML = uploadedFiles.map((f, i) => `
+    <button onclick="showDebugFile(${i})" id="dbgtab-${i}"
+      style="background:var(--surface2);border:0.5px solid var(--border-mid);border-radius:6px;
+             padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text-sec);font-family:inherit;">
+      ${f.name}
+    </button>
+  `).join('');
+
+  window.showDebugFile = (i) => {
+    textEl.textContent = (window._lastPDFText[i] || '(vacío)').slice(0, 5000);
+    document.querySelectorAll('[id^=dbgtab-]').forEach(b => b.style.background = 'var(--surface2)');
+    const tab = document.getElementById('dbgtab-' + i);
+    if (tab) tab.style.background = 'var(--accent-light)';
+  };
+
+  showDebugFile(0);
+
+  // Add "Ver texto" link near error or below analyze button
+  let trigger = document.getElementById('debugTrigger');
+  if (!trigger) {
+    trigger = document.createElement('div');
+    trigger.id = 'debugTrigger';
+    trigger.style.cssText = 'margin-top:8px; text-align:center;';
+    trigger.innerHTML = `<button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'"
+      style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-hint);font-family:inherit;text-decoration:underline;">
+      🔍 Ver texto extraído del PDF</button>`;
+    document.getElementById('loadingBox').after(trigger);
+  }
+  panel.style.display = 'none'; // hidden until clicked
+}
+</script>
+</body>
+</html>
