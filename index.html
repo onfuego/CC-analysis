@@ -92,15 +92,14 @@
     transition: border-color 0.2s, background 0.2s;
     cursor: pointer;
     position: relative;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .upload-area:hover, .upload-area.drag-over {
     border-color: var(--accent-mid);
     background: var(--accent-light);
-  }
-
-  .upload-area input[type="file"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
   }
 
   .upload-icon {
@@ -373,7 +372,7 @@
   }
 
   .btn-analyze:hover { opacity: 0.88; }
-  .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* btn-analyze disabled state handled by JS */
 
   .loading {
     display: none;
@@ -552,20 +551,20 @@
 
   <!-- TAB: UPLOAD -->
   <div class="tab-content active" id="tab-upload">
+
     <div class="upload-area" id="dropZone">
-      <input type="file" id="fileInput" accept=".pdf,.txt" multiple>
       <span class="upload-icon">📂</span>
-      <h3>Arrastra tus estados de cuenta aquí</h3>
-      <p>Acepta PDF o TXT · Múltiples archivos</p>
-      <button class="btn-primary" type="button" onclick="document.getElementById('fileInput').click(); event.stopPropagation();">
-        Elegir archivos
-      </button>
+      <h3>Selecciona tus estados de cuenta</h3>
+      <p>Acepta PDF · Múltiples archivos a la vez</p>
+      <input type="file" id="fileInput" accept=".pdf,.txt" multiple
+             onchange="handleFiles(this.files)"
+             style="display:block;margin:1rem auto 0;font-size:13px;cursor:pointer;max-width:300px;">
     </div>
 
-    <div class="cards-list" id="fileList"></div>
+    <div id="fileList"></div>
 
     <div class="analyze-btn-wrap">
-      <button class="btn-analyze" id="analyzeBtn" onclick="analyzeFiles()" disabled>
+      <button class="btn-analyze" id="analyzeBtn" onclick="analyzeFiles()" >
         Analizar estados de cuenta
       </button>
     </div>
@@ -722,37 +721,65 @@ function hideResults() {
   document.getElementById('errorBox').classList.remove('visible');
 }
 
-// FILE UPLOAD
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
+// FILE UPLOAD — wrapped to guarantee DOM is ready
+function setupFileUpload() {
+  const dropZone = document.getElementById('dropZone');
+  const btn = document.getElementById('analyzeBtn');
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  handleFiles([...e.dataTransfer.files]);
-});
+  // Set initial disabled state via JS only (no HTML attribute)
+  if (btn) {
+    btn.setAttribute('disabled', 'disabled');
+    btn.style.cssText = 'opacity:0.4;cursor:not-allowed;';
+  }
 
-fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
+  if (!dropZone) return;
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', setupFileUpload);
 
 function handleFiles(files) {
-  files.forEach(f => {
+  if (!files || files.length === 0) return;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
     if (!uploadedFiles.find(u => u.name === f.name)) uploadedFiles.push(f);
-  });
+  }
   renderFileList();
 }
 
 function renderFileList() {
-  const list = document.getElementById('fileList');
-  list.innerHTML = uploadedFiles.map((f, i) => `
-    <div class="card-badge">
-      <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
-      ${f.name}
-      <button onclick="removeFile(${i})" title="Eliminar">×</button>
-    </div>
-  `).join('');
-  document.getElementById('analyzeBtn').disabled = uploadedFiles.length === 0;
+  const container = document.getElementById('fileList');
+  const btn = document.getElementById('analyzeBtn');
+  if (!container || !btn) return;
+
+  if (uploadedFiles.length === 0) {
+    container.innerHTML = '';
+    btn.setAttribute('disabled', 'disabled');
+    btn.style.cssText = 'opacity:0.4;cursor:not-allowed;';
+    return;
+  }
+
+  let html = '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:8px;">';
+  for (let i = 0; i < uploadedFiles.length; i++) {
+    const f = uploadedFiles[i];
+    const color = COLORS[i % COLORS.length];
+    html += '<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:0.5px solid var(--border);border-radius:8px;padding:9px 14px;">'
+      + '<span style="width:9px;height:9px;border-radius:50%;background:' + color + ';flex-shrink:0;"></span>'
+      + '<span style="font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f.name + '</span>'
+      + '<button onclick="removeFile(' + i + ')" style="background:none;border:none;cursor:pointer;color:#999;font-size:20px;line-height:1;padding:0 4px;">×</button>'
+      + '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+
+  btn.removeAttribute('disabled');
+  btn.style.cssText = 'opacity:1;cursor:pointer;';
 }
 
 function removeFile(i) {
@@ -831,16 +858,16 @@ async function analyzeFiles() {
     const tarjetas = [];
     for (let i = 0; i < uploadedFiles.length; i++) {
       const f = uploadedFiles[i];
-      document.getElementById('loadingMsg').textContent = `Leyendo ${f.name} (${i+1}/${uploadedFiles.length})...`;
+      document.getElementById('loadingMsg').textContent = 'Leyendo ' + f.name + ' (' + (i+1) + '/' + uploadedFiles.length + ')...';
       let text = '';
       try { text = await extractTextFromPDF(f); } catch(e) { text = ''; }
-      const parsed = parseEstadoCuenta(text, f.name, i);
+      const parsed = parseEstadoCuenta(text, f.name, i, null);
       if (parsed) tarjetas.push(parsed);
     }
     renderResults({ tarjetas });
     showDebugButton();
   } catch(e) {
-    showError('Error al analizar: ' + e.message + '. Intenta con el ingreso manual.');
+    showError('Error al analizar: ' + e.message);
   } finally {
     showLoading(false);
   }
@@ -850,26 +877,27 @@ async function analyzeFiles() {
 
 function parseMoney(s) {
   if (!s) return 0;
-  // Formato chileno: $12.000.000 o 6.685.802 — quitar $, puntos de miles
   return parseInt(s.replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(/,\d+$/, '')) || 0;
 }
 
 function extractNumbers(s) {
-  const matches = [...s.matchAll(/\$?\s*((?:\d{1,3})(?:\.\d{3})*|\d{4,})/g)];
+  // Acepta tanto "$12.000.000" (BCI) como "$ 12.000.000" (Banco de Chile)
+  const matches = [...s.matchAll(/\$\s*((?:\d{1,3})(?:\.\d{3})*|\d{4,})/g)];
   return matches.map(m => parseMoney(m[1])).filter(n => n >= 1000);
 }
 
 // ─── Parser principal ────────────────────────────────────────────────────────
 
-function parseEstadoCuenta(rawText, filename, idx) {
+function parseEstadoCuenta(rawText, filename, idx, bancoForzado = null) {
   window._lastPDFText = window._lastPDFText || [];
   window._lastPDFText[idx] = rawText;
 
   const lines = rawText.replace(/\r/g, '\n').split('\n').map(l => l.trim()).filter(Boolean);
 
   // ── 1. Nombre del banco ───────────────────────────────────────────────────
-  // Buscar solo en líneas cortas que no sean transacciones (sin fechas DD/MM ni montos $)
-  let nombre = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  let nombre = bancoForzado || filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+
+  if (!bancoForzado) {
   const isTransactionLine = l => /\d{2}\/\d{2}\/?\d{0,2}/.test(l) || /\$[\d\.]{3,}/.test(l);
   const headerText = lines.filter(l => l.length < 80 && !isTransactionLine(l)).join(' ');
 
@@ -890,6 +918,7 @@ function parseEstadoCuenta(rawText, filename, idx) {
   for (const { re, label } of bancosTexto) {
     if (re.test(headerText) || re.test(filename)) { nombre = label; break; }
   }
+  } // end if(!bancoForzado)
 
   // Las páginas internacionales ya fueron filtradas en extractTextFromPDF.
   // Verificar que quede al menos contenido nacional.
@@ -955,7 +984,7 @@ function parseEstadoCuenta(rawText, filename, idx) {
   }
 
   // ── 3. Pagos mensuales y liberación de cupo ──────────────────────────────
-  const cuotaLineRe = /(\d{2})\/(\d{2})\s+\$([\d\.]+)\s*$/;
+  const cuotaLineRe = /(\d{2})\/(\d{2})\s+\$\s*([\d\.]+)\s*$/;
   const compras = [];
   const movimientos = []; // detalle para la tabla
 
@@ -969,15 +998,17 @@ function parseEstadoCuenta(rawText, filename, idx) {
     const restantes = total - actual;
     if (valor < 500 || total > 60) continue;
 
-    // Monto original de la compra: primer $ de la línea
-    const allMontos = [...line.matchAll(/\$([\d\.]+)/g)].map(x => parseMoney(x[1]));
+    // Monto original de la compra: primer $ de la línea (con o sin espacio)
+    const allMontos = [...line.matchAll(/\$\s*([\d\.]+)/g)].map(x => parseMoney(x[1]));
     const montoCompra = allMontos.length > 0 ? allMontos[0] : valor * total;
 
-    // Descripción: limpiar fecha, código, y sufijo numérico
+    // Descripción: soporta lugar+fecha (Banco de Chile: "SANTIAGO 13/11/25 110510237552 DESC")
+    // y sin lugar (BCI: "SANTIAGO 29/01/26 0805 10527311 DESC")
     let desc = line
-      .replace(/^[A-Z\s]+\d{2}\/\d{2}\/?\d{0,2}\s+\d{4}\s+\w+\s+/, '') // quitar lugar+fecha+cod
-      .replace(/\s+TASA\s+INT.*$/i, '')   // quitar tasa interés
-      .replace(/[\d\.\$\s\/]+$/, '')       // quitar números del final
+      .replace(/^[A-ZÁÉÍÓÚ\s]{0,20}\d{2}\/\d{2}\/?\d{0,2}\s+\d{6,}\s+/, '') // lugar+fecha+cod largo
+      .replace(/^[A-ZÁÉÍÓÚ\s]{0,20}\d{2}\/\d{2}\/?\d{0,2}\s+\d{4}\s+\w+\s+/, '') // lugar+fecha+cod corto
+      .replace(/\s+TASA\s+INT.*$/i, '')
+      .replace(/[\d\.\$\s\/]+$/, '')
       .trim().slice(0, 45) || 'Compra en cuotas';
 
     if (restantes > 0) {
