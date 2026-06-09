@@ -640,18 +640,14 @@
   <div class="results" id="results">
     <div class="divider"></div>
     <p class="section-title">Resumen general</p>
-
     <div class="metrics-grid" id="metricsGrid"></div>
-
-    <p class="section-title" style="margin-top:1.5rem;">Cupo por tarjeta</p>
-    <div id="progressBars"></div>
 
     <p class="section-title" style="margin-top:1.5rem;">Pagos próximos meses</p>
     <div class="chart-card">
       <h3>Cuotas mensuales</h3>
       <div class="legend" id="paymentsLegend"></div>
       <div style="position:relative; width:100%; height:220px;">
-        <canvas id="paymentsChart" role="img" aria-label="Gráfico de pagos mensuales próximos 12 meses"></canvas>
+        <canvas id="paymentsChart"></canvas>
       </div>
       <div style="overflow-x:auto; margin-top:1.25rem;">
         <table class="payments-table" id="paymentsMonthTable">
@@ -663,38 +659,45 @@
 
     <p class="section-title" style="margin-top:1.5rem;">Desglose por mes</p>
     <div class="chart-card" id="desgloseCard">
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <label style="font-size:13px; color:var(--text-sec); font-weight:500;">Ver mes:</label>
-        <select id="mesSelect" style="font-size:14px; padding:6px 10px; border-radius:var(--radius-sm); border:0.5px solid var(--border-mid); background:var(--surface2); color:var(--text); font-family:inherit; cursor:pointer;">
-        </select>
-        <span id="desgloseTotalBadge" style="margin-left:auto; font-size:13px; color:var(--text-sec);"></span>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem;">
+        <label style="font-size:13px;color:var(--text-sec);font-weight:500;">Ver mes:</label>
+        <select id="mesSelect" style="font-size:14px;padding:6px 10px;border-radius:var(--radius-sm);border:0.5px solid var(--border-mid);background:var(--surface2);color:var(--text);font-family:inherit;cursor:pointer;"></select>
+        <span id="desgloseTotalBadge" style="margin-left:auto;font-size:13px;color:var(--text-sec);"></span>
       </div>
-      <div style="overflow-x:auto; margin-top:1rem;">
+
+      <!-- Tabla de movimientos con dropdown de categoría -->
+      <div style="overflow-x:auto;">
         <table class="payments-table" id="desgloseTable">
           <thead>
             <tr>
               <th>Movimiento</th>
-              <th>Tarjeta</th>
               <th style="text-align:center">Cuota</th>
               <th style="text-align:right">Monto compra</th>
               <th style="text-align:right">Valor cuota</th>
+              <th>Categoría</th>
             </tr>
           </thead>
           <tbody id="desgloseBody"></tbody>
         </table>
       </div>
-    </div>
 
-    <p class="section-title" style="margin-top:1.5rem;">Liberación de cupo</p>
-    <div class="chart-card">
-      <h3>Cupo disponible acumulado</h3>
-      <div style="position:relative; width:100%; height:220px;">
-        <canvas id="availableChart" role="img" aria-label="Gráfico de cupo disponible a través del tiempo"></canvas>
+      <!-- Gráfico de torta + tabla de categorías (debajo de la tabla) -->
+      <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;margin-top:1.5rem;padding-top:1.25rem;border-top:0.5px solid var(--border);">
+        <div style="width:200px;height:200px;flex-shrink:0;position:relative;overflow:hidden;">
+          <canvas id="categoryChart" width="200" height="200" style="width:200px!important;height:200px!important;display:block;"></canvas>
+        </div>
+        <div style="flex:1;min-width:240px;overflow-x:auto;">
+          <table class="payments-table" id="categoryTable">
+            <thead><tr>
+              <th>Categoría</th>
+              <th style="text-align:right">Monto</th>
+              <th style="text-align:right">%</th>
+            </tr></thead>
+            <tbody id="categoryBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
-
-    <p class="section-title" style="margin-top:1.5rem;">Movimientos en cuotas</p>
-    <div id="movimientosContainer"></div>
   </div>
 
 </div>
@@ -703,10 +706,40 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 const COLORS = ['#2a7d4f','#1a5fa8','#b5590a','#7c3aab','#1e7b7b','#b52a2a','#5a7a1e'];
+
+const CATEGORIAS = [
+  'Supermercado','Restaurants','Delivery','Combustible',
+  'Transporte Público','Aplicaciones de Transporte','Mantenimiento Vehículo',
+  'Farmacia y medicamentos','Consultas médicas y exámenes','Seguros de Salud',
+  'Cuidado personal','Vivienda','Cuentas del hogar','Hogar y Decoración',
+  'Estudios y Postgrados','Material de estudio','Capacitaciones',
+  'Suscripciones Digitales','Eventos y salidas','Tecnología y Gadgets',
+  'Hobbies','Equipamiento Deportivo','Eventos Deportivos',
+  'Alimentación Mascota','Veterinaria y salud mascota','Accesorios y cuidado mascota',
+  'Vestuario y Calzado','Regalos','Donaciones','Fondos y Acciones','Ahorro','Emergencias'
+];
+
+const CAT_COLORS = [
+  '#2a7d4f','#1a5fa8','#b5590a','#7c3aab','#1e7b7b','#b52a2a','#5a7a1e',
+  '#c0832a','#3a7abf','#7a3a2a','#2a5a7c','#7c5a2a','#4a2a7c','#2a7c5a',
+  '#7c2a4a','#4a7c2a','#2a4a7c','#7c4a2a','#5a2a7c','#2a7c3a',
+  '#8a4a1e','#1e4a8a','#4a8a1e','#8a1e4a','#1e8a4a','#4a1e8a',
+  '#6a3a1e','#1e3a6a','#3a6a1e','#6a1e3a','#1e6a3a','#3a1e6a'
+];
+
+// Persistir categorías en memoria (clave = desc|tarjeta)
+const categoriasGuardadas = {};
+
+function getCatKey(desc, tarjeta) { return desc + '||' + tarjeta; }
+function saveCat(desc, tarjeta, cat) {
+  categoriasGuardadas[getCatKey(desc, tarjeta)] = cat;
+  renderCategoriasChart(parseInt(document.getElementById('mesSelect')?.value || 0));
+}
+function getCat(desc, tarjeta) { return categoriasGuardadas[getCatKey(desc, tarjeta)] || ''; }
 let uploadedFiles = [];
 let manualCards = [];
 let manualInstallments = [];
-let paymentsChartObj, availableChartObj;
+let paymentsChartObj, categoryChartObj;
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -918,7 +951,27 @@ function parseEstadoCuenta(rawText, filename, idx, bancoForzado = null) {
   for (const { re, label } of bancosTexto) {
     if (re.test(headerText) || re.test(filename)) { nombre = label; break; }
   }
+
+  // Detectar red de la tarjeta (Visa / Mastercard / Amex)
+  // Puede venir en el nombre del archivo o en el texto del PDF
+  const fullSearch = headerText + ' ' + filename;
+  let red = '';
+  if (/visa/i.test(fullSearch))                          red = 'Visa';
+  else if (/mastercard|master\s*card/i.test(fullSearch)) red = 'Mastercard';
+  else if (/amex|american\s*express/i.test(fullSearch))  red = 'Amex';
+
+  // Componer nombre final: "Tarjeta de crédito Visa BCI"
+  nombre = 'Tarjeta de crédito' + (red ? ' ' + red : '') + ' ' + nombre;
+
   } // end if(!bancoForzado)
+
+  // Si el banco fue forzado manualmente, aplicar prefijo también
+  if (bancoForzado) {
+    const redForzado = /visa/i.test(filename) ? 'Visa'
+      : /mastercard|master/i.test(filename) ? 'Mastercard'
+      : /amex/i.test(filename) ? 'Amex' : '';
+    nombre = 'Tarjeta de crédito' + (redForzado ? ' ' + redForzado : '') + ' ' + bancoForzado;
+  }
 
   // Las páginas internacionales ya fueron filtradas en extractTextFromPDF.
   // Verificar que quede al menos contenido nacional.
@@ -1014,13 +1067,56 @@ function parseEstadoCuenta(rawText, filename, idx, bancoForzado = null) {
     if (restantes > 0) {
       compras.push({ restantes, valor });
     }
-    // Guardar todos para la tabla (incluyendo ya pagadas si total > 1)
+    // Movimientos del mes ACTUAL: los que tienen cuota actual >= 1 (ya facturados)
+    // y los 00/TT (nuevas compras de este período)
+    // Todos estos aparecen en el estado de cuenta del mes actual
     if (total > 1) {
       movimientos.push({ desc, montoCompra, valor, actual, total, restantes });
     }
+    // Para el mes actual incluir todo lo que aparece facturado (actual >= 0)
+    // total=1 son compras de contado, las excluimos del análisis de cuotas
   }
 
-  // Calcular pagos mensuales y cupo liberado acumulado
+  // ── Movimientos del mes ACTUAL ────────────────────────────────────────────
+  // Incluye: cuotas (total > 1) + compras de contado (total = 1) del período
+  // Excluye: pagos/abonos (líneas con '-'), traspasos de deuda internacional,
+  //          líneas de totales/resumen sin descripción de comercio
+  const movimientosActuales = [];
+  const skipPatterns = /TRASPASO\s+DEUDA|MONTO\s+CANCELADO|TOTAL\s+(PAGOS|TARJETA|TRANSAC|OPERAT|PAT\b)/i;
+  const cargoPatterns = /IMPUESTO|COMISION|COBRO\s+ADM|INTERESES?\s+ROTAT/i;
+
+  for (const line of workLines) {
+    if (line.includes('-')) continue;
+    const m = line.match(cuotaLineRe);
+    if (!m) continue;
+    const actual = parseInt(m[1]);
+    const total  = parseInt(m[2]);
+    const valor  = parseMoney(m[3]);
+    if (valor < 500 || total > 60) continue;
+    if (skipPatterns.test(line)) continue;
+
+    const allMontos = [...line.matchAll(/\$\s*([\d\.]+)/g)].map(x => parseMoney(x[1]));
+    const montoCompra = allMontos.length > 0 ? allMontos[0] : valor;
+
+    let desc = line
+      .replace(/^[A-ZÁÉÍÓÚ\s]{0,20}\d{2}\/\d{2}\/?\d{0,2}\s+\d{6,}\s+/, '')
+      .replace(/^[A-ZÁÉÍÓÚ\s]{0,20}\d{2}\/\d{2}\/?\d{0,2}\s+\d{4}\s+\w+\s+/, '')
+      .replace(/\s+TASA\s+INT.*$/i, '')
+      .replace(/[\d\.\$\s\/]+$/, '')
+      .trim().slice(0, 45) || 'Compra en cuotas';
+
+    const numCuotaActual = actual === 0 ? 1 : actual;
+    movimientosActuales.push({
+      desc,
+      montoCompra,
+      valor,
+      actual: numCuotaActual,
+      total: total === 1 ? 1 : total,
+      restantes: total - actual,
+      esContado: total === 1,
+      esCargo: cargoPatterns.test(line)
+    });
+  }
   let pagosMensuales = [];
   let cupoLiberadoAcumulado = [];
 
@@ -1075,6 +1171,7 @@ function parseEstadoCuenta(rawText, filename, idx, bancoForzado = null) {
     tasa_rotativa: tasaRotativa,
     cuotas,
     movimientos,
+    movimientosActuales,
     _pagosMensuales: pagosMensuales,
     _cupoLiberadoAcumulado: cupoLiberadoAcumulado
   };
@@ -1232,66 +1329,43 @@ function renderResults(data) {
     </div>` : ''}
   `;
 
-  // Progress bars
-  const pb = document.getElementById('progressBars');
-  pb.innerHTML = tarjetas.map((t, i) => {
-    const pct = t.cupo_total > 0 ? (t.cupo_usado / t.cupo_total * 100) : 0;
-    const cls = pct > 70 ? 'high' : pct > 40 ? 'mid' : 'low';
-    const extras = [
-      t.pago_mes_actual > 0 ? `<span>Facturado: <strong>${fmt(t.pago_mes_actual)}</strong></span>` : '',
-      t.pago_minimo > 0     ? `<span>Mínimo: <strong>${fmt(t.pago_minimo)}</strong></span>` : '',
-      t.tasa_rotativa > 0   ? `<span>Rotativo: <strong>${t.tasa_rotativa.toFixed(2)}% m.</strong></span>` : '',
-    ].filter(Boolean).join(' · ');
-    return `
-      <div class="progress-section">
-        <div class="progress-header">
-          <span class="name" style="color:${COLORS[i % COLORS.length]}">${t.nombre}</span>
-          <div class="amounts">
-            <div>${fmt(t.cupo_disponible)} disponible</div>
-            <div style="color:var(--text-hint)">${fmt(t.cupo_usado)} usado de ${fmt(t.cupo_total)}</div>
-          </div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill ${cls}" style="width:${Math.min(pct,100).toFixed(1)}%"></div>
-        </div>
-        <div class="progress-meta">
-          <span>${pct.toFixed(1)}% utilizado</span>
-          <span>${(100-pct).toFixed(1)}% libre</span>
-        </div>
-        ${extras ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sec);">${extras}</div>` : ''}
-      </div>
-    `;
-  }).join('');
-
-  // Chart data — usar horizonte completo de cuotas
+  // Chart data — mes actual + próximos meses
   const today = new Date();
   const horizonte12 = Math.max(
     12,
     ...tarjetas.map(t => t._pagosMensuales ? t._pagosMensuales.length : 0)
   );
-  const monthLabels = [];
+
+  // Label del mes actual
+  const mesActualChartLabel = new Date(today.getFullYear(), today.getMonth(), 1)
+    .toLocaleDateString('es-CL', { month: 'short', year: '2-digit' });
+
+  // Labels: mes actual + siguientes
+  const monthLabels = [mesActualChartLabel];
   for (let i = 0; i < Math.min(horizonte12, 36); i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    monthLabels.push(d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }));
+    const lbl = d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' });
+    // Evitar duplicar el mes actual si i=0
+    if (i > 0) monthLabels.push(lbl);
   }
 
   const paymentsData = tarjetas.map((t, idx) => ({
     label: t.nombre,
     color: COLORS[idx % COLORS.length],
-    data: monthLabels.map((_, mi) => getMonthPaymentForCard(t, mi))
+    // índice 0 = mes actual (pago_mes_actual), índice 1..N = _pagosMensuales[0..N-1]
+    data: monthLabels.map((_, mi) =>
+      mi === 0 ? (t.pago_mes_actual || 0) : getMonthPaymentForCard(t, mi - 1)
+    )
   }));
 
   // Payments legend
   const legend = document.getElementById('paymentsLegend');
-  legend.innerHTML = paymentsData.map(d => `
-    <span><span class="legend-dot" style="background:${d.color}"></span>${d.nombre || d.label}</span>
-  `).join('');
+  legend.innerHTML = paymentsData.map(d =>
+    '<span><span class="legend-dot" style="background:' + d.color + '"></span>' + (d.nombre || d.label) + '</span>'
+  ).join('');
 
-  // Destroy old charts
   if (paymentsChartObj) paymentsChartObj.destroy();
-  if (availableChartObj) availableChartObj.destroy();
 
-  // Payments chart (stacked bar)
   paymentsChartObj = new Chart(document.getElementById('paymentsChart'), {
     type: 'bar',
     data: {
@@ -1318,190 +1392,66 @@ function renderResults(data) {
     }
   });
 
-  // Cupo disponible a través del tiempo
-  // Extender el horizonte hasta que se libere todo el cupo (o máx 36 meses)
-  const maxMeses = Math.max(
-    12,
-    ...tarjetas.map(t => t._pagosMensuales ? t._pagosMensuales.length : 0)
-  );
-  const horizonte = Math.min(maxMeses, 36);
-
-  // Generar labels para todo el horizonte
-  const allMonthLabels = [];
-  for (let i = 0; i < horizonte; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    allMonthLabels.push(d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }));
-  }
-
-  // Cupo disponible total inicial y total máximo
-  const totalCupoDisp0 = tarjetas.reduce((s, t) => s + (t.cupo_disponible || 0), 0);
-  const totalCupoMax   = tarjetas.reduce((s, t) => s + (t.cupo_total || 0), 0);
-
-  const availableData = allMonthLabels.map((_, mi) => getCupoDisponibleEnMes(tarjetas, mi));
-  // Agregar punto 0 = hoy (cupo disponible actual)
-  availableData.unshift(totalCupoDisp0);
-  allMonthLabels.unshift('Hoy');
-
-  availableChartObj = new Chart(document.getElementById('availableChart'), {
-    type: 'line',
-    data: {
-      labels: allMonthLabels,
-      datasets: [{
-        label: 'Cupo disponible',
-        data: availableData,
-        borderColor: '#2a7d4f',
-        backgroundColor: 'rgba(42,125,79,0.06)',
-        fill: true,
-        tension: 0.35,
-        pointRadius: (ctx) => ctx.dataIndex === 0 ? 5 : 3,
-        pointBackgroundColor: '#2a7d4f',
-        borderWidth: 2
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        annotation: undefined,
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const v = ctx.parsed.y;
-              const pct = totalCupoMax > 0 ? ((v / totalCupoMax) * 100).toFixed(1) : 0;
-              return ` $${Math.round(v).toLocaleString('es-CL')}  (${pct}% libre)`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#888', maxTicksLimit: 12 } },
-        y: {
-          min: 0, max: totalCupoMax,
-          grid: { color: 'rgba(128,128,128,0.1)' },
-          ticks: {
-            font: { size: 11 }, color: '#888',
-            callback: v => '$' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v)
-          }
-        }
-      }
-    }
-  });
-
-  // Movimientos en cuotas — agrupados por tarjeta
-  const container = document.getElementById('movimientosContainer');
-  let movHtml = '';
-
-  tarjetas.forEach((t, idx) => {
-    const movs = t.movimientos || [];
-    // Separar en pendientes (restantes > 0) y ya pagados (restantes = 0)
-    const pendientes = movs.filter(m => m.restantes > 0);
-    const pagados    = movs.filter(m => m.restantes === 0);
-
-    if (movs.length === 0) return;
-
-    movHtml += `
-      <div class="chart-card" style="padding:0; overflow:hidden; margin-bottom:1rem;">
-        <div style="padding:0.9rem 1.1rem 0.7rem; border-bottom:0.5px solid var(--border); display:flex; align-items:center; gap:8px;">
-          <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[idx%COLORS.length]};flex-shrink:0;display:inline-block;"></span>
-          <span style="font-size:14px;font-weight:500;">${t.nombre}</span>
-          <span style="font-size:12px;color:var(--text-hint);margin-left:auto;">${pendientes.length} pendiente${pendientes.length!==1?'s':''} · ${pagados.length} pagada${pagados.length!==1?'s':''}</span>
-        </div>
-        <table class="payments-table">
-          <thead>
-            <tr>
-              <th>Descripción</th>
-              <th style="text-align:right">Monto compra</th>
-              <th style="text-align:right">Valor cuota</th>
-              <th style="text-align:center">Pagadas</th>
-              <th style="text-align:center">Restantes</th>
-              <th style="text-align:center">Progreso</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
-    // Primero pendientes, luego pagadas
-    const renderRow = (mv, isPaid) => {
-      const pct = Math.round((mv.actual / mv.total) * 100);
-      const barColor = isPaid ? '#6b6a65' : (mv.restantes <= 2 ? '#d97706' : '#2a7d4f');
-      return `<tr style="${isPaid ? 'opacity:0.5' : ''}">
-        <td style="font-size:13px;">${mv.desc}</td>
-        <td class="amount" style="font-size:13px;">${fmt(mv.montoCompra)}</td>
-        <td class="amount" style="font-size:13px;">${fmt(mv.valor)}</td>
-        <td style="text-align:center;font-size:13px;">${mv.actual}</td>
-        <td style="text-align:center;font-size:13px;font-weight:${isPaid?'400':'500'};color:${isPaid?'var(--text-hint)':'var(--text)'};">${mv.restantes}</td>
-        <td style="padding:8px 12px;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="flex:1;height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;">
-              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:99px;"></div>
-            </div>
-            <span style="font-size:11px;color:var(--text-hint);min-width:28px;text-align:right;">${mv.actual}/${mv.total}</span>
-          </div>
-        </td>
-      </tr>`;
-    };
-
-    pendientes.forEach(mv => { movHtml += renderRow(mv, false); });
-    pagados.forEach(mv   => { movHtml += renderRow(mv, true);  });
-
-    movHtml += `</tbody></table></div>`;
-  });
-
-  if (!movHtml) {
-    movHtml = `<div style="text-align:center;color:var(--text-hint);padding:2rem;font-size:14px;">No se encontraron compras en cuotas</div>`;
-  }
-
-  container.innerHTML = movHtml;
-
   // ── Tabla de pagos mensuales ──────────────────────────────────────────────
-  // Encabezado: Tarjeta | mes1 | mes2 | ... | Total
   const thead = document.getElementById('paymentsMonthHead');
   const tbody2 = document.getElementById('paymentsMonthBody');
 
-  // Construir encabezado de meses
   let headHtml = '<th>Tarjeta</th>';
-  monthLabels.forEach(ml => {
-    headHtml += `<th style="text-align:right;white-space:nowrap;">${ml}</th>`;
+  monthLabels.forEach((ml, mi) => {
+    const label = mi === 0 ? ml + ' <span style="font-size:10px;color:var(--accent)">(actual)</span>' : ml;
+    headHtml += '<th style="text-align:right;white-space:nowrap;">' + label + '</th>';
   });
   headHtml += '<th style="text-align:right">Total</th>';
   thead.innerHTML = headHtml;
 
-  // Una fila por tarjeta
   let bodyHtml = '';
   const totalesPorMes = new Array(monthLabels.length).fill(0);
 
   tarjetas.forEach((t, idx) => {
-    const pagosPorMes = monthLabels.map((_, mi) => getMonthPaymentForCard(t, mi));
+    // índice 0 = mes actual, índice 1..N = _pagosMensuales[0..N-1]
+    const pagosPorMes = monthLabels.map((_, mi) =>
+      mi === 0 ? (t.pago_mes_actual || 0) : getMonthPaymentForCard(t, mi - 1)
+    );
     const totalTarjeta = pagosPorMes.reduce((s, v) => s + v, 0);
     pagosPorMes.forEach((v, mi) => { totalesPorMes[mi] += v; });
 
-    bodyHtml += `<tr>
-      <td style="white-space:nowrap;font-size:13px;">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[idx%COLORS.length]};margin-right:6px;vertical-align:middle;"></span>
-        ${t.nombre}
-      </td>`;
+    bodyHtml += '<tr><td style="white-space:nowrap;font-size:13px;">'
+      + '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + COLORS[idx%COLORS.length] + ';margin-right:6px;vertical-align:middle;"></span>'
+      + t.nombre + '</td>';
     pagosPorMes.forEach(v => {
-      bodyHtml += `<td class="amount" style="font-size:13px;color:${v===0?'var(--text-hint)':'var(--text)'}">${v===0 ? '—' : fmt(v)}</td>`;
+      bodyHtml += '<td class="amount" style="font-size:13px;color:' + (v===0?'var(--text-hint)':'var(--text)') + '">' + (v===0?'—':fmt(v)) + '</td>';
     });
-    bodyHtml += `<td class="amount" style="font-size:13px;font-weight:500;">${fmt(totalTarjeta)}</td></tr>`;
+    bodyHtml += '<td class="amount" style="font-size:13px;font-weight:500;">' + fmt(totalTarjeta) + '</td></tr>';
   });
 
-  // Fila de totales
   const granTotal = totalesPorMes.reduce((s, v) => s + v, 0);
-  bodyHtml += `<tr class="total-row"><td>Total</td>`;
+  bodyHtml += '<tr class="total-row"><td>Total</td>';
   totalesPorMes.forEach(v => {
-    bodyHtml += `<td class="amount">${v === 0 ? '—' : fmt(v)}</td>`;
+    bodyHtml += '<td class="amount">' + (v===0?'—':fmt(v)) + '</td>';
   });
-  bodyHtml += `<td class="amount">${fmt(granTotal)}</td></tr>`;
+  bodyHtml += '<td class="amount">' + fmt(granTotal) + '</td></tr>';
 
   tbody2.innerHTML = bodyHtml;
 
   // ── Desglose por mes ──────────────────────────────────────────────────────
-  // Para cada mes, construir la lista de movimientos que aportan una cuota ese mes.
-  // Un movimiento aporta al mes N si N < restantes (igual que el cálculo de pagos).
-  // La cuota que se paga en el mes N es la número (actual + N + 1) de total.
+  // Mes 0 = mes actual del extracto, mes 1..N = próximos meses con cuotas pendientes
 
-  // Construir índice: mesIndex → [ { tarjeta, desc, montoCompra, valor, actual, total, numCuotaEnMes } ]
-  const desglosePorMes = monthLabels.map((_, mi) => {
+  const itemsMesActual = [];
+  tarjetas.forEach((t, tidx) => {
+    (t.movimientosActuales || []).forEach(mv => {
+      itemsMesActual.push({
+        tarjeta: t.nombre,
+        color: COLORS[tidx % COLORS.length],
+        desc: mv.desc,
+        montoCompra: mv.montoCompra,
+        valor: mv.valor,
+        numCuota: mv.actual,
+        total: mv.total
+      });
+    });
+  });
+
+  const desgloseFuturos = monthLabels.map((_, mi) => {
     const items = [];
     tarjetas.forEach((t, tidx) => {
       (t.movimientos || []).forEach(mv => {
@@ -1512,7 +1462,7 @@ function renderResults(data) {
             desc: mv.desc,
             montoCompra: mv.montoCompra,
             valor: mv.valor,
-            numCuota: mv.actual + mi + 1,  // cuota que se paga ese mes
+            numCuota: mv.actual + mi + 1,
             total: mv.total
           });
         }
@@ -1521,42 +1471,145 @@ function renderResults(data) {
     return items;
   });
 
-  // Populate dropdown
+  const desglosePorMes = [itemsMesActual, ...desgloseFuturos];
+  window._desglosePorMes = desglosePorMes;
+  window._pagoMesActualTotal = tarjetas.reduce((s, t) => s + (t.pago_mes_actual || 0), 0);
+
+  const mesActualLabel = (() => {
+    const d = new Date(today.getFullYear(), today.getMonth(), 1);
+    return d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }) + ' (actual)';
+  })();
+  const allLabels = [mesActualLabel, ...monthLabels];
+
   const sel = document.getElementById('mesSelect');
-  sel.innerHTML = monthLabels.map((label, mi) => {
-    const total = desglosePorMes[mi].reduce((s, i) => s + i.valor, 0);
-    return `<option value="${mi}">${label}  —  ${fmt(total)}</option>`;
+  sel.innerHTML = allLabels.map((label, mi) => {
+    const total = mi === 0 && window._pagoMesActualTotal > 0
+      ? window._pagoMesActualTotal
+      : desglosePorMes[mi].reduce((s, i) => s + i.valor, 0);
+    return '<option value="' + mi + '">' + label + '  —  ' + fmt(total) + '</option>';
   }).join('');
 
-  function renderDesglose(mi) {
-    const items = desglosePorMes[mi] || [];
-    const total = items.reduce((s, i) => s + i.valor, 0);
-    document.getElementById('desgloseTotalBadge').innerHTML =
-      `<strong>${items.length}</strong> cuota${items.length!==1?'s':''} · Total: <strong style="color:var(--accent)">${fmt(total)}</strong>`;
+  sel.addEventListener('change', () => {
+    const mi = parseInt(sel.value);
+    renderDesgloseTabla(mi);
+    renderCategoriasChart(mi);
+  });
 
-    const db = document.getElementById('desgloseBody');
-    if (items.length === 0) {
-      db.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-hint);padding:1.5rem;">Sin cuotas este mes</td></tr>`;
-      return;
-    }
-    db.innerHTML = items.map(item => `
-      <tr>
-        <td style="font-size:13px;">${item.desc}</td>
-        <td style="font-size:13px;white-space:nowrap;">
-          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${item.color};margin-right:5px;vertical-align:middle;"></span>
-          ${item.tarjeta}
-        </td>
-        <td style="text-align:center;font-size:13px;color:var(--text-sec);">${item.numCuota}/${item.total}</td>
-        <td class="amount" style="font-size:13px;color:var(--text-sec);">${fmt(item.montoCompra)}</td>
-        <td class="amount" style="font-size:13px;font-weight:500;">${fmt(item.valor)}</td>
-      </tr>`).join('');
-  }
-
-  sel.addEventListener('change', () => renderDesglose(parseInt(sel.value)));
-  renderDesglose(0);
+  renderDesgloseTabla(0);
+  renderCategoriasChart(0);
 
   document.getElementById('results').classList.add('visible');
   document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderDesgloseTabla(mi) {
+  const items = (window._desglosePorMes || [])[mi] || [];
+  const total = items.reduce((s, i) => s + i.valor, 0);
+
+  // Para el mes actual, mostrar el total facturado real si está disponible
+  const totalDisplay = (mi === 0 && window._pagoMesActualTotal && window._pagoMesActualTotal > 0)
+    ? window._pagoMesActualTotal : total;
+
+  document.getElementById('desgloseTotalBadge').innerHTML =
+    '<strong>' + items.length + '</strong> movimiento' + (items.length !== 1 ? 's' : '') +
+    ' · Total: <strong style="color:var(--accent)">' + fmt(totalDisplay) + '</strong>';
+
+  const db = document.getElementById('desgloseBody');
+  if (items.length === 0) {
+    db.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-hint);padding:1.5rem;">Sin movimientos este mes</td></tr>';
+    return;
+  }
+
+  const catOptions = CATEGORIAS.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+
+  db.innerHTML = items.map((item) => {
+    const savedCat = getCat(item.desc, item.tarjeta);
+    const cuotaLabel = item.numCuota + '/' + item.total;
+    return '<tr>' +
+      '<td style="font-size:13px;">' + item.desc + '</td>' +
+      '<td style="text-align:center;font-size:13px;color:var(--text-sec);">' + cuotaLabel + '</td>' +
+      '<td class="amount" style="font-size:13px;color:var(--text-sec);">' + fmt(item.montoCompra) + '</td>' +
+      '<td class="amount" style="font-size:13px;font-weight:500;">' + fmt(item.valor) + '</td>' +
+      '<td>' +
+        '<select onchange="saveCat(\'' + item.desc.replace(/'/g, "\\'") + '\',\'' + item.tarjeta.replace(/'/g, "\\'") + '\',this.value)"' +
+          ' style="font-size:12px;padding:3px 6px;border-radius:6px;border:0.5px solid var(--border-mid);background:var(--surface2);color:var(--text);font-family:inherit;max-width:170px;">' +
+          '<option value="">— Categoría —</option>' + catOptions.replace('value="' + savedCat + '"', 'value="' + savedCat + '" selected') +
+        '</select>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderCategoriasChart(mi) {
+  const items = (window._desglosePorMes || [])[mi] || [];
+  const totalMes = items.reduce((s, i) => s + i.valor, 0);
+
+  // Agrupar por categoría
+  const catMap = {};
+  items.forEach(item => {
+    const cat = getCat(item.desc, item.tarjeta);
+    if (!cat) return;
+    catMap[cat] = (catMap[cat] || 0) + item.valor;
+  });
+
+  const cats = Object.keys(catMap).sort((a, b) => catMap[b] - catMap[a]);
+
+  // Tabla de categorías
+  const catBody = document.getElementById('categoryBody');
+  if (cats.length === 0) {
+    catBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-hint);padding:1rem;font-size:13px;">Asigna categorías a los movimientos para ver el desglose</td></tr>';
+    const canvas = document.getElementById('categoryChart');
+    if (canvas) canvas.style.display = 'none';
+    if (categoryChartObj) { categoryChartObj.destroy(); categoryChartObj = null; }
+    return;
+  }
+
+  document.getElementById('categoryChart').style.display = 'block';
+  catBody.innerHTML = cats.map((cat, i) => {
+    const monto = catMap[cat];
+    const pct = totalMes > 0 ? (monto / totalMes * 100).toFixed(1) : 0;
+    return '<tr>' +
+      '<td style="font-size:13px;display:flex;align-items:center;gap:6px;">' +
+        '<span style="width:10px;height:10px;border-radius:2px;background:' + CAT_COLORS[i % CAT_COLORS.length] + ';flex-shrink:0;display:inline-block;"></span>' +
+        cat +
+      '</td>' +
+      '<td class="amount" style="font-size:13px;">' + fmt(monto) + '</td>' +
+      '<td class="amount" style="font-size:13px;color:var(--text-sec);">' + pct + '%</td>' +
+    '</tr>';
+  }).join('');
+
+  // Pie chart
+  if (categoryChartObj) categoryChartObj.destroy();
+  const catCanvas = document.getElementById('categoryChart');
+  catCanvas.width = 200;
+  catCanvas.height = 200;
+  categoryChartObj = new Chart(catCanvas, {
+    type: 'doughnut',
+    data: {
+      labels: cats,
+      datasets: [{
+        data: cats.map(c => catMap[c]),
+        backgroundColor: cats.map((_, i) => CAT_COLORS[i % CAT_COLORS.length]),
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = totalMes > 0 ? (ctx.parsed / totalMes * 100).toFixed(1) : 0;
+              return ' ' + fmt(ctx.parsed) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 function getMonthPayment(tarjetas, monthIndex) {
